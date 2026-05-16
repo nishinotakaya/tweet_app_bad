@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Todoリスト</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Hiragino Sans", sans-serif;
+    background: #f5f5f7;
+    margin: 0;
+    padding: 24px;
+    color: #222;
+  }
+  h1 { font-size: 24px; margin-bottom: 16px; }
+  .container { max-width: 720px; margin: 0 auto; }
+  .add-btn {
+    background: #1d9bf0;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 24px;
+    font-size: 15px;
+    cursor: pointer;
+    margin-bottom: 20px;
+  }
+  .add-btn:hover { background: #1a8cd8; }
+  .post {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .post-title { font-weight: 600; font-size: 16px; margin-bottom: 6px; }
+  .post-body { color: #444; font-size: 14px; white-space: pre-wrap; }
+  .post-actions { margin-top: 10px; display: flex; gap: 8px; }
+  .post-actions button {
+    background: #eee;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 16px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .post-actions .delete { background: #ffe5e5; color: #c00; }
+  .empty {
+    text-align: center;
+    color: #999;
+    padding: 40px 0;
+  }
+  .modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 10;
+    justify-content: center;
+    align-items: center;
+  }
+  .modal-backdrop.show { display: flex; }
+  .modal {
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    width: 90%;
+    max-width: 480px;
+  }
+  .modal h2 { margin: 0 0 16px; font-size: 18px; }
+  .modal label { display: block; font-size: 13px; margin-bottom: 4px; color: #666; }
+  .modal input, .modal textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    margin-bottom: 12px;
+  }
+  .modal textarea { min-height: 100px; resize: vertical; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .modal-actions button {
+    padding: 8px 18px;
+    border-radius: 20px;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .cancel { background: #eee; }
+  .submit { background: #1d9bf0; color: #fff; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>📝 つぶやき管理</h1>
+    <button class="add-btn" onclick="document.getElementById('addModal').classList.add('show')">＋ 新規投稿</button>
+
+    <div id="postList"></div>
+    <div id="emptyMessage" class="empty">まだ投稿がありません</div>
+  </div>
+
+  <!-- 追加モーダル -->
+  <div id="addModal" class="modal-backdrop">
+    <div class="modal">
+      <h2>新規投稿</h2>
+      <form id="addForm">
+        <label>タイトル</label>
+        <input type="text" id="addTitle" required>
+        <label>内容</label>
+        <textarea id="addBody" required></textarea>
+        <div class="modal-actions">
+          <button type="button" class="cancel" onclick="document.getElementById('addModal').classList.remove('show')">キャンセル</button>
+          <button type="submit" class="submit">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 編集モーダル -->
+  <div id="editModal" class="modal-backdrop">
+    <div class="modal">
+      <h2>投稿を編集</h2>
+      <form id="editForm">
+        <input type="hidden" id="editId">
+        <label>タイトル</label>
+        <input type="text" id="editTitle" required>
+        <label>内容</label>
+        <textarea id="editBody" required></textarea>
+        <div class="modal-actions">
+          <button type="button" class="cancel" onclick="document.getElementById('editModal').classList.remove('show')">キャンセル</button>
+          <button type="submit" class="submit">更新</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<script>
+  // ↓ローカルストレージから復元（無ければサンプル2件で初期化）
+  let posts = [];
+  let nextId = 1;
+  const saved = localStorage.getItem('bad-posts-v1');
+  if (saved) {
+    const data = JSON.parse(saved);
+    posts = data.posts;
+    nextId = data.nextId;
+  }
+
+  function savePosts() {
+    localStorage.setItem('bad-posts-v1', JSON.stringify({ posts: posts, nextId: nextId }));
+  }
+
+  function renderPosts() {
+    const listEl = document.getElementById('postList');
+    const emptyEl = document.getElementById('emptyMessage');
+    listEl.innerHTML = '';
+    if (posts.length === 0) {
+      emptyEl.style.display = 'block';
+      return;
+    }
+    emptyEl.style.display = 'none';
+    for (let i = 0; i < posts.length; i++) {
+      const p = posts[i];
+      const html =
+        '<div class="post">' +
+          '<div class="post-title">' + escapeHtml(p.title) + '</div>' +
+          '<div class="post-body">' + escapeHtml(p.body) + '</div>' +
+          '<div class="post-actions">' +
+            '<button onclick="openEdit(' + p.id + ')">編集</button>' +
+            '<button class="delete" onclick="deletePost(' + p.id + ')">削除</button>' +
+          '</div>' +
+        '</div>';
+      listEl.insertAdjacentHTML('beforeend', html);
+    }
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  document.getElementById('addForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const title = document.getElementById('addTitle').value;
+    const body = document.getElementById('addBody').value;
+    posts.push({ id: nextId++, title: title, body: body });
+    savePosts();
+    document.getElementById('addForm').reset();
+    document.getElementById('addModal').classList.remove('show');
+    renderPosts();
+  });
+
+  function openEdit(id) {
+    const p = posts.find(function(x) { return x.id === id; });
+    if (!p) return;
+    document.getElementById('editId').value = p.id;
+    document.getElementById('editTitle').value = p.title;
+    document.getElementById('editBody').value = p.body;
+    document.getElementById('editModal').classList.add('show');
+  }
+
+  document.getElementById('editForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const id = parseInt(document.getElementById('editId').value, 10);
+    const title = document.getElementById('editTitle').value;
+    const body = document.getElementById('editBody').value;
+    const p = posts.find(function(x) { return x.id === id; });
+    if (p) {
+      p.title = title;
+      p.body = body;
+    }
+    savePosts();
+    document.getElementById('editModal').classList.remove('show');
+    renderPosts();
+  });
+
+  function deletePost(id) {
+    if (!confirm('削除しますか？')) return;
+    posts = posts.filter(function(x) { return x.id !== id; });
+    savePosts();
+    renderPosts();
+  }
+
+  if (posts.length === 0) {
+    posts.push({ id: nextId++, title: 'はじめての投稿', body: 'これはサンプルです。\n編集・削除を試してみてください。' });
+    posts.push({ id: nextId++, title: 'タンスの話', body: '整理しないと引き出しが閉まらなくなる。コードも同じ。' });
+    savePosts();
+  }
+  renderPosts();
+</script>
+</body>
+</html>
