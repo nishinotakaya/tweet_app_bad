@@ -189,7 +189,7 @@
   });
 
   function openEdit(id) {
-    const p = posts.find(function(x) { return x.id === id; });
+    const p = posts.find(function(c) { return c.id === id; });
     if (!p) return;
     document.getElementById('editId').value = p.id;
     document.getElementById('editTitle').value = p.title;
@@ -202,7 +202,7 @@
     const id = parseInt(document.getElementById('editId').value, 10);
     const title = document.getElementById('editTitle').value;
     const body = document.getElementById('editBody').value;
-    const p = posts.find(function(x) { return x.id === id; });
+    const p = posts.find(function(c) { return c.id === id; });
     if (p) {
       p.title = title;
       p.body = body;
@@ -214,7 +214,7 @@
 
   function deletePost(id) {
     if (!confirm('削除しますか？')) return;
-    posts = posts.filter(function(x) { return x.id !== id; });
+    posts = posts.filter(function(c) { return c.id !== id; });
     savePosts();
     renderPosts();
   }
